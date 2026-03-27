@@ -17,6 +17,7 @@ interface GameScreenProps {
   score: number;
   track: Track;
   onGuessSubmit: (roundScore: RoundScore, track: Track, guess: number) => void;
+  onQuit: () => void;
 }
 
 function formatTime(secs: number): string {
@@ -25,7 +26,7 @@ function formatTime(secs: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export default function GameScreen({ round, score, track, onGuessSubmit }: GameScreenProps) {
+export default function GameScreen({ round, score, track, onGuessSubmit, onQuit }: GameScreenProps) {
   const [inputValue, setInputValue] = useState('');
   const [locked, setLocked] = useState(false);
   const { bpm: tapBpm, tap, reset: resetTap, tapCount } = useTapTempo();
@@ -115,7 +116,35 @@ export default function GameScreen({ round, score, track, onGuessSubmit }: GameS
         padding: '20px 0 16px',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
-        <Logo size="sm" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <Logo size="sm" />
+          <button
+            onClick={() => { audioEngine.stop(); onQuit(); }}
+            className="btn-active"
+            style={{
+              background: 'none',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '6px',
+              color: 'rgba(255,255,255,0.3)',
+              fontFamily: 'JetBrains Mono, monospace',
+              fontSize: '11px',
+              letterSpacing: '1px',
+              padding: '5px 10px',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,80,80,0.4)';
+              (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,80,80,0.7)';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.1)';
+              (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.3)';
+            }}
+          >
+            quit
+          </button>
+        </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{
             fontFamily: 'JetBrains Mono, monospace',

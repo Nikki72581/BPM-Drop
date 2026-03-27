@@ -85,6 +85,7 @@ export default function Home() {
             score={state.score}
             track={state.tracks[state.round - 1]}
             onGuessSubmit={handleGuessSubmit}
+            onQuit={restart}
           />
         )}
 
