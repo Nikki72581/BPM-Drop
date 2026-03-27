@@ -1,65 +1,115 @@
-import Image from "next/image";
+'use client';
+import { useState } from 'react';
+import Scanline from '../components/Scanline';
+import StartScreen from '../components/StartScreen';
+import GameScreen from '../components/GameScreen';
+import ResultScreen from '../components/ResultScreen';
+import GameOverScreen from '../components/GameOverScreen';
+import { useGameState } from '../hooks/useGameState';
+import { fetchTracksForDifficulty, selectRoundTracks } from '../lib/tracks';
+import type { Difficulty, Track } from '../lib/tracks';
+import type { RoundScore } from '../lib/scoring';
+
+const ROUNDS_PER_GAME = 10;
 
 export default function Home() {
+  const { state, startGame, submitGuess, nextRound, gameOver, restart } = useGameState();
+  const [loadingTracks, setLoadingTracks] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [playerName, setPlayerName] = useState('anonymous');
+
+  const handleStart = async (difficulty: Difficulty, name: string) => {
+    setPlayerName(name);
+    setLoadError(null);
+    setLoadingTracks(true);
+    try {
+      const allTracks = await fetchTracksForDifficulty(difficulty);
+      const tracks = selectRoundTracks(allTracks, ROUNDS_PER_GAME);
+      startGame(difficulty, tracks);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Failed to load tracks. Check your API key.');
+    } finally {
+      setLoadingTracks(false);
+    }
+  };
+
+  const handleGuessSubmit = (roundScore: RoundScore, track: Track, guess: number) => {
+    submitGuess(roundScore, track, guess);
+  };
+
+  const handleNext = () => {
+    if (state.phase !== 'result') return;
+    if (state.round >= ROUNDS_PER_GAME) {
+      gameOver(playerName, state.allRounds);
+    } else {
+      nextRound();
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+    <main style={{
+      minHeight: '100vh',
+      background: '#0a0a12',
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      <Scanline />
+
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        {state.phase === 'start' && (
+          <>
+            <StartScreen
+              onStart={handleStart}
+              loading={loadingTracks}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            {loadError && (
+              <div style={{
+                maxWidth: '520px',
+                margin: '0 auto',
+                padding: '0 24px',
+                textAlign: 'center',
+                fontFamily: 'JetBrains Mono, monospace',
+                fontSize: '12px',
+                color: '#ff4444',
+              }}>
+                {loadError}
+              </div>
+            )}
+          </>
+        )}
+
+        {state.phase === 'playing' && (
+          <GameScreen
+            key={`round-${state.round}`}
+            round={state.round}
+            score={state.score}
+            track={state.tracks[state.round - 1]}
+            onGuessSubmit={handleGuessSubmit}
+          />
+        )}
+
+        {state.phase === 'result' && (
+          <ResultScreen
+            roundScore={state.roundScore}
+            track={state.track}
+            guess={state.guess}
+            round={state.round}
+            totalScore={state.score}
+            isLastRound={state.round >= ROUNDS_PER_GAME}
+            onNext={handleNext}
+          />
+        )}
+
+        {state.phase === 'gameover' && (
+          <GameOverScreen
+            score={state.score}
+            rounds={state.rounds}
+            difficulty={state.difficulty}
+            playerName={state.playerName}
+            onPlayAgain={restart}
+          />
+        )}
+      </div>
+    </main>
   );
 }
